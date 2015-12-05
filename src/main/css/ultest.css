@@ -1,0 +1,34 @@
+<style>
+#tools {
+  line-height: 100px;
+  background-color: #cccccc;
+  text-align: center;
+  padding: 0px;
+  overflow-y: auto;
+}
+#header {
+  position: relative;
+  background-color: white;
+  text-align: center;
+  vertical-align: middle;
+  padding: 0px;
+}
+#editor {
+    background-color: yellow;
+  float:left;
+}
+#footer {
+  background-color: #CCCCCC;
+  padding: 0px;
+}
+#output-box {
+  background-color: inherit;
+  width: 100%;
+  height: 300px;
+  word-wrap: break-word;
+}
+#user-input {
+    background-color: black;
+  float:left;
+}
+</style>

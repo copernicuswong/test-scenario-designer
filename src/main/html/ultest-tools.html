@@ -1,0 +1,27 @@
+<link rel="import" href="polymer.html">
+<dom-module id="tool-button" attributes="icon,caption">
+  <template>
+<style>
+#tool {
+  width: 100px;
+  height: 100px;
+  font-family: "arial";
+  text-align: center;
+  font-size: 9;
+}
+</style>
+<div id="tool">
+      <img id="image" src="../resources/{{icon}}.png"/><br>
+      {{caption}}
+</div>
+</template>
+<script>
+  Polymer({
+    is: 'tool-button',
+    properties: {
+      icon: String
+    }
+  })
+</script>
+
+</dom-module>
