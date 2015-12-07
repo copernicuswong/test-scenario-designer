@@ -14,6 +14,7 @@ objectName = "com.ullink.testtools.ultest:name=ShipIt,type=ULTestExternalMBean";
     }
     
     var currentSession;
+
     
     createExecutionSession = function(response) {
         console.log(response)
@@ -45,16 +46,17 @@ objectName = "com.ullink.testtools.ultest:name=ShipIt,type=ULTestExternalMBean";
     }
     
     onExecuting = function() {
-        document.getElementById('status-image').src = '../resources/running.png';
+        
+        //document.getElementById('status-image').src = '../resources/running.png';
     }
     
     onComplete = function() {
-        document.getElementById('status-image').src = '../resources/running.png';
+        //document.getElementById('status-image').src = '../resources/running.png';
         currentSession = null;
     }
     
     onError = function() {
-        document.getElementById('status-image').src = '../resources/running.png';
+        //document.getElementById('status-image').src = '../resources/running.png';
         currentSession = null;
     }
     
