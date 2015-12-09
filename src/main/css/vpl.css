@@ -1,0 +1,68 @@
+.left-panel{
+	position: absolute;
+	top: 0px;
+	bottom: 0px;
+	left: 0px;
+	width: 15%;
+	border: 3px solid #FF0000;
+}
+
+.right-panel{
+	position: absolute;
+	top: 0px;
+	bottom: 0px;
+	right: 0px;
+	width: 15%;
+	border: 3px solid #00FF00;
+}
+
+.central-upper-panel{
+	position: absolute;
+	top: 0px;
+	bottom: 30%;
+	left: 15%;
+	right: 15%;
+	border: 3px solid #0000FF;
+}
+
+.central-lower-panel{
+	position: absolute;
+	top: 70%;
+	bottom: 0px;
+	left: 15%;
+	right: 15%;
+	border: 3px solid #000000;
+}
+
+.connection{
+	stroke: #999;
+}
+
+.mainImage{
+	position: absolute;
+	width: 50px;
+	height: 50px;
+	z-index:1;
+}
+
+.imageFrame{
+	position: relative;
+	width: 50px;
+	height: 50px;
+	z-index: 2;
+}
+
+.icon{
+	width: 60px;
+	height: 60px;
+	draggable: true;
+}
+
+.element .element-tools {
+	display: none;
+	cursor: pointer
+}
+
+.element:hover .element-tools {
+	display: inline;
+}
