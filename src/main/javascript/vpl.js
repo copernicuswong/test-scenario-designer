@@ -309,7 +309,7 @@ joint.shapes.vpl.ForTimesLoop = joint.shapes.vpl.Loop.extend({
 
         type: 'vpl.ForTimesLoop',
         attrs: { image: { 'xlink:href': '../resources/times_loop.png' }},
-        params:{ numberOfTimes: ''}
+        params:{ times: ''}
     }, joint.shapes.vpl.Loop.prototype.defaults)
 });
 

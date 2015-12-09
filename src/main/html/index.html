@@ -110,7 +110,9 @@ function dropOnEditor(ev){
         <tr>
           <td width="100px" align="center"><i id="status"/></td>
           <td width="50px"><i id="play" onclick="execute();"/></td>
-          <td><i id="stop" onclick="stop();"/></td>
+          <td width="50px"><i id="stop" onclick="stop();"/></td>
+					<td width="50px"><i id="saveScript" onclick="saveScript();"/></td>
+					<td width="50px"><i id="loadScript" onclick="loadScript();"/></td>
         </tr>
       </table>
       </div>
@@ -150,6 +152,11 @@ function dropOnEditor(ev){
   p.set('triangle').color("green").size('40').rotate("right");
   var stop = new Marka('#stop');
   stop.set('square').color("red").size('40');
+	var saveScriptMarka = new Marka('#saveScript');
+	saveScriptMarka.set('angle-double').color("orange").size('50').rotate("down");
+	var loadScriptMarka = new Marka('#loadScript');
+	loadScriptMarka.set('angle-double').color("blue").size('50');
+
   execute = function() {
 		  var graphJson = graph.toJSON();
 			var graphJsonStr = JSON.stringify(graphJson);
@@ -162,6 +169,26 @@ function dropOnEditor(ev){
   stop = function() {
       m.set("circle-times").color("red");
   }
+	saveScript = function(){
+		if (typeof(Storage)!=='undefined'){
+			var graphJson = graph.toJSON();
+			var graphJsonStr = JSON.stringify(graphJson);
+			localStorage.setItem("graphJson", graphJsonStr);
+			alert("Save Script");
+		}else{
+			alert("Cannot save script: local storage is undefined");
+		}
+	}
+	loadScript = function(){
+		if (typeof(Storage)!=='undefined'){
+			var graphJsonStr = localStorage.getItem("graphJson");
+			var graphJson = JSON.parse(graphJsonStr);
+			graph.fromJSON(graphJson);
+			alert("Loaded Script");
+		}else{
+			alert("Cannot save script: local storage is undefined");
+		}
+	}
 
 	var currentAttributes = {
 		currentBlock: {},
@@ -330,38 +357,40 @@ function dropOnEditor(ev){
 		}
 	};
 
+  function initPaper(){
+		paper = new joint.dia.Paper({
+			el: $('#editor'),
+			model: graph,
+			width: 2000, height: 600, gridSize: 1,
+			snapLinks: true,
+			linkPinning: false,
+			defaultLink: new joint.shapes.logic.Wire,
 
-	paper = new joint.dia.Paper({
-		el: $('#editor'),
-		model: graph,
-		width: 2000, height: 600, gridSize: 1,
-		snapLinks: true,
-		linkPinning: false,
-		defaultLink: new joint.shapes.logic.Wire,
-
-		validateConnection: function(vs, ms, vt, mt, e, vl) {
-			if (e === 'target') {
-				// target requires an input port to connect
-				return (mt && mt.getAttribute('class') && mt.getAttribute('class').toLowerCase().indexOf('input') >= 0);
-			} else { // e === 'source'
-				// source requires an output port to connect
-				return ms && ms.getAttribute('class') && ms.getAttribute('class').toLowerCase().indexOf('output') >= 0;
+			validateConnection: function(vs, ms, vt, mt, e, vl) {
+				if (e === 'target') {
+					// target requires an input port to connect
+					return (mt && mt.getAttribute('class') && mt.getAttribute('class').toLowerCase().indexOf('input') >= 0);
+				} else { // e === 'source'
+					// source requires an output port to connect
+					return ms && ms.getAttribute('class') && ms.getAttribute('class').toLowerCase().indexOf('output') >= 0;
+				}
 			}
-		}
-	});
+		});
 
-	paper.on('cell:pointerdblclick', function(cellView, evt, x, y){
-    //alert(cellView.model.id + " is clicked, type = " + cellView.model.attributes.type);
-		showAttrs(cellView);
-	});
+		paper.on('cell:pointerdblclick', function(cellView, evt, x, y){
+			showAttrs(cellView);
+		});
 
-	var startBlock = new joint.shapes.vpl.Start({
-			position: { x: 20, y: 20 }
-			});
-	var endBlock = new joint.shapes.vpl.End({
-			position: { x: 450, y: 450 }
-			});
-	graph.addCells([startBlock, endBlock]);
+		var startBlock = new joint.shapes.vpl.Start({
+				position: { x: 20, y: 20 }
+				});
+		var endBlock = new joint.shapes.vpl.End({
+				position: { x: 450, y: 450 }
+				});
+		graph.addCells([startBlock, endBlock]);
+	}
+	initPaper();
+
 </script>
 </body>
 </html>
