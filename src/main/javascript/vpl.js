@@ -384,11 +384,20 @@ function createNodeForBlockAndLink(block, latestNode){
   return node;
 }
 
+function createNodeForBlockAndLinkLoopBody(block, latestNode){
+  var node = new GraphNode(block);
+  latestNode.loopBodyNode = node;
+  node.prevNode = latestNode;
+  return node;
+}
+
+
 function hasContent(str){
   return (str && str.trim() != '');
 }
 
-convertBlockToCode = function(vplBlock){
+convertNodeToCode = function(vplNode){
+  var vplBlock = vplNode.block;
   if (vplBlock.type === 'vpl.Start' || vplBlock.type === 'vpl.End' || vplBlock.type === 'logic.Wire'){
     return '';
   }
@@ -442,49 +451,119 @@ convertBlockToCode = function(vplBlock){
     code = code.concat(vplBlock.params.tokens);
     return code;
   }
+  if (vplBlock.type === 'vpl.WhileLoop'){
+    code = code.concat('while ( ');
+    code = code.concat(vplBlock.params.condition);
+    code = code.concat(' )\n');
+    var loopBodyNode = vplNode.loopBodyNode;  // first loop body node, from vplNode.loopBodyNode
+    while (loopBodyNode){
+      var codeInLoop = convertNodeToCode(loopBodyNode);
+      if (hasContent(codeInLoop)){
+        code = code.concat('    ');
+        code = code.concat(codeInLoop);
+        code = code.concat('\n');
+      }
+      loopBodyNode = loopBodyNode.nextNode;// subsequent loop body node, should be from loopBodyNode.nextNode
+    }
+    code = code.concat('endwhile');
+    return code;
+  }
+  if (vplBlock.type === 'vpl.ForTimesLoop'){
+    code = code.concat('Loop ');
+    code = code.concat(vplBlock.params.times);
+    code = code.concat('\n');
+    var loopBodyNode = vplNode.loopBodyNode;  // first loop body node, from vplNode.loopBodyNode
+    while (loopBodyNode){
+      var codeInLoop = convertNodeToCode(loopBodyNode);
+      if (hasContent(codeInLoop)){
+        code = code.concat('    ');
+        code = code.concat(codeInLoop);
+        code = code.concat('\n');
+      }
+      loopBodyNode = loopBodyNode.nextNode;// subsequent loop body node, should be from loopBodyNode.nextNode
+    }
+    code = code.concat('EndLoop');
+    return code;
+  }
   return null;
 }
 
 joint.shapes.vpl.convertGraphToCode = function(graphJson){
   var structuredGraph;
   var latestNode;
+  var latestLoopBodyNode;
+  var inLoopBody = false;
+  var justFinishedLoopBody = false;
   var array = graphJson.cells;
-  for(var i in array){
-    var vplBlock = array[i];
-    var vplBlockType = vplBlock.type;
+  for(var i = 0; i < 1000; i++){ // set a limit to avoid infinite loop due to invalid structure
     if (!structuredGraph){
       var startBlock = findVplBlockByType(array, 'vpl.Start');
       var firstNode = new GraphNode(startBlock);
       structuredGraph = firstNode;
       latestNode = firstNode;
     }else{
-      if ('logic.Wire' === latestNode.block.type){
-        var nextBlock = findVplBlockById(array, latestNode.block.target.id);
-        if (nextBlock){
-          var node = createNodeForBlockAndLink(nextBlock, latestNode);
-          latestNode = node;
-        }else{
-            alert("Invalid Program, no next block from wire " + latestNode.block.id);
-        }
-        latestNode.block.id
-      }else if ('vpl.IfElse' === latestNode.block.type){
-      }else if ('vpl.End' === latestNode.block.type){
-        break; //done
+      var interestedNode;
+      if (inLoopBody){
+        interestedNode = latestLoopBodyNode;
       }else{
-          var wire = findVplBlockBySourcePort(array, latestNode.block.id, 'out');
-          if (wire){
-            var node = createNodeForBlockAndLink(wire, latestNode);
-            latestNode = node;
+        interestedNode = latestNode;
+      }
+      var interestedBlockType = interestedNode.block.type;
+      if ('vpl.End' === interestedBlockType){
+        break; //done
+      }else if ('logic.Wire' === interestedBlockType){
+        var nextBlock = findVplBlockById(array, interestedNode.block.target.id);
+        if (nextBlock){
+          var node = createNodeForBlockAndLink(nextBlock, interestedNode);
+          if (inLoopBody){
+            latestLoopBodyNode = node;
           }else{
-            alert("Invalid Program, not wire from output of " + latestNode.block.id);
+            latestNode = node;
           }
+        }else{
+          alert("Invalid Program, no next block from wire " + latestNode.block.id);
+          break;
+        }
+      }else if ('vpl.IfElse' === interestedBlockType){
+
+      }else if (!inLoopBody && !justFinishedLoopBody
+         && ('vpl.WhileLoop' === interestedBlockType || 'vpl.ForTimesLoop' === interestedBlockType || 'vpl.ForEachLoop' === interestedBlockType)){
+        inLoopBody = true;
+        var wire = findVplBlockBySourcePort(array, interestedNode.block.id, 'loopBody');
+        if (wire){
+          var node = createNodeForBlockAndLinkLoopBody(wire, interestedNode);
+          latestLoopBodyNode = node;
+        }else{
+          // loop has not body, still valid
+          inLoopBody = false;
+        }
+      }else{
+        var wire = findVplBlockBySourcePort(array, interestedNode.block.id, 'out');
+        if (wire){
+          var node = createNodeForBlockAndLink(wire, interestedNode);
+          if (inLoopBody){
+            latestLoopBodyNode = node;
+          }else{
+            latestNode = node;
+            justFinishedLoopBody = false;
+          }
+        }else{
+          if (!inLoopBody){
+            alert("Invalid Program, not wire from output of " + interestedNode.block.id);
+            break;
+          }else{
+            // the end of loop body
+            inLoopBody = false;
+            justFinishedLoopBody = true;
+          }
+        }
       }
     }
   }// end of for loop
   var currentNode = structuredGraph;
   var code = '';
   while (currentNode){
-    var convertedCode = convertBlockToCode(currentNode.block);
+    var convertedCode = convertNodeToCode(currentNode);
     if (hasContent(convertedCode)){
       if (hasContent(code)){
         code = code.concat('\n');
