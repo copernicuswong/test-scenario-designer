@@ -154,6 +154,9 @@ function dropOnEditor(ev){
 		  var graphJson = graph.toJSON();
 			var graphJsonStr = JSON.stringify(graphJson);
 			alert(graphJsonStr);
+			var code = joint.shapes.vpl.convertGraphToCode(graphJson);
+			alert(code);
+			executeScript('dummyPath', code, 'dummyOpts');
       m.set("circle-o-filled").color("green");
   }
   stop = function() {

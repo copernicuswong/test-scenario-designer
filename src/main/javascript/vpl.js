@@ -182,7 +182,7 @@ joint.shapes.vpl.Send = joint.shapes.vpl.Block_1_1.extend({
 
         type: 'vpl.Send',
         attrs: { image: { 'xlink:href': '../resources/send.png' }},
-        params: { message: ''}
+        params: { pluginName: '', message: ''}
     }, joint.shapes.vpl.Block_1_1.prototype.defaults)
 });
 
@@ -224,7 +224,7 @@ joint.shapes.vpl.WaitForMessage = joint.shapes.vpl.Block_1_1.extend({
 joint.shapes.vpl.WaitForLog = joint.shapes.vpl.Block_1_1.extend({
     defaults: joint.util.deepSupplement({
 
-        type: 'vpl.WaitForMessage',
+        type: 'vpl.WaitForLog',
         attrs: { '.annotation': { text: 'L' }}
 
     }, joint.shapes.vpl.Wait.prototype.defaults)
@@ -324,6 +324,174 @@ joint.shapes.vpl.ForTimesLoopView = joint.shapes.vpl.BlockView;
 joint.shapes.vpl.PrintView = joint.shapes.vpl.BlockView;
 joint.shapes.vpl.WaitForLogView = joint.shapes.vpl.BlockView;
 joint.shapes.vpl.WaitForMessageView = joint.shapes.vpl.BlockView;
-joint.shapes.vpl.WaitForMessageView = joint.shapes.vpl.BlockView;
 joint.shapes.vpl.SendView = joint.shapes.vpl.BlockView;
 joint.shapes.vpl.SetVariableView = joint.shapes.vpl.BlockView;
+
+//=====================================================================
+// translation of JSON to program code
+function findVplBlockById(vplBlocksArray, targetId){
+  for (var i in vplBlocksArray){
+    var vplBlock = vplBlocksArray[i];
+    if (vplBlock){
+      if (vplBlock.id === targetId){
+        return vplBlock;
+      }
+    }
+  }
+  return null;
+}
+
+function findVplBlockBySourcePort(vplBlocksArray, sourceId, sourcePort){
+  for (var i in vplBlocksArray){
+    var vplBlock = vplBlocksArray[i];
+    if (vplBlock){
+      var vplBlockSource = vplBlock.source;
+      if (vplBlockSource){
+        if (vplBlockSource.id === sourceId && vplBlockSource.port == sourcePort){
+          return vplBlock;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function findVplBlockByType(vplBlocksArray, targetVplBlockType){
+  for (var i in vplBlocksArray){
+    var vplBlock = vplBlocksArray[i];
+    if (vplBlock){
+        if (vplBlock.type === targetVplBlockType){
+          return vplBlock;
+        }
+    }
+  }
+  return null;
+}
+
+function GraphNode(blk){
+    this.block = blk;
+    this.prevNode;
+    this.nextNode;
+    this.ifNextNode;
+    this.elseNextNode;
+    this.loopBodyNode;
+};
+
+function createNodeForBlockAndLink(block, latestNode){
+  var node = new GraphNode(block);
+  latestNode.nextNode = node;
+  node.prevNode = latestNode;
+  return node;
+}
+
+function hasContent(str){
+  return (str && str.trim() != '');
+}
+
+convertBlockToCode = function(vplBlock){
+  if (vplBlock.type === 'vpl.Start' || vplBlock.type === 'vpl.End' || vplBlock.type === 'logic.Wire'){
+    return '';
+  }
+  var code = '';
+  if (vplBlock.type === 'vpl.SetVariable'){
+    for (var varName in vplBlock.params){
+      if (hasContent(varName)){
+        if (hasContent(code)){
+          code = code.concat('\n');
+        }
+        code = code.concat(varName);
+        code = code.concat(' = ');
+        code = code.concat(vplBlock.params[varName]);
+      }
+    }
+    return code;
+  }
+  if (vplBlock.type === 'vpl.Connect'){
+    code = code.concat('connect ');
+    code = code.concat(vplBlock.params.pluginName);
+    if (hasContent(vplBlock.params.as)){
+      code = code.concat(' as ');
+      code = code.concat(vplBlock.params.as);
+    }
+    return code;
+  }
+  if (vplBlock.type === 'vpl.Send'){
+    code = code.concat('send ');
+    code = code.concat(vplBlock.params.pluginName);
+    code = code.concat(' ');
+    code = code.concat(vplBlock.params.message);
+    return code;
+  }
+  if (vplBlock.type === 'vpl.WaitForMessage'){
+    if (hasContent(vplBlock.retValDest)){
+        code = code.concat(vplBlock.retValDest);
+        code = code.concat(' = ');
+    }
+    code = code.concat('waitFor ');
+    code = code.concat(vplBlock.params.pluginName);
+    code = code.concat(' ');
+    code = code.concat(vplBlock.params.message);
+    if (hasContent(vplBlock.params.timeOutMs)){
+        code = code.concat(' for ');
+        code = code.concat(vplBlock.params.timeOutMs);
+    }
+    return code;
+  }
+  if (vplBlock.type === 'vpl.Print'){
+    code = code.concat('print ');
+    code = code.concat(vplBlock.params.tokens);
+    return code;
+  }
+  return null;
+}
+
+joint.shapes.vpl.convertGraphToCode = function(graphJson){
+  var structuredGraph;
+  var latestNode;
+  var array = graphJson.cells;
+  for(var i in array){
+    var vplBlock = array[i];
+    var vplBlockType = vplBlock.type;
+    if (!structuredGraph){
+      var startBlock = findVplBlockByType(array, 'vpl.Start');
+      var firstNode = new GraphNode(startBlock);
+      structuredGraph = firstNode;
+      latestNode = firstNode;
+    }else{
+      if ('logic.Wire' === latestNode.block.type){
+        var nextBlock = findVplBlockById(array, latestNode.block.target.id);
+        if (nextBlock){
+          var node = createNodeForBlockAndLink(nextBlock, latestNode);
+          latestNode = node;
+        }else{
+            alert("Invalid Program, no next block from wire " + latestNode.block.id);
+        }
+        latestNode.block.id
+      }else if ('vpl.IfElse' === latestNode.block.type){
+      }else if ('vpl.End' === latestNode.block.type){
+        break; //done
+      }else{
+          var wire = findVplBlockBySourcePort(array, latestNode.block.id, 'out');
+          if (wire){
+            var node = createNodeForBlockAndLink(wire, latestNode);
+            latestNode = node;
+          }else{
+            alert("Invalid Program, not wire from output of " + latestNode.block.id);
+          }
+      }
+    }
+  }// end of for loop
+  var currentNode = structuredGraph;
+  var code = '';
+  while (currentNode){
+    var convertedCode = convertBlockToCode(currentNode.block);
+    if (hasContent(convertedCode)){
+      if (hasContent(code)){
+        code = code.concat('\n');
+      }
+      code = code.concat(convertedCode);
+    }
+    currentNode = currentNode.nextNode;
+  }
+  return code;
+}
