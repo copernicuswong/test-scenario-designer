@@ -183,9 +183,7 @@ function dropOnEditor(ev){
   execute = function() {
 		  var graphJson = graph.toJSON();
 			var graphJsonStr = JSON.stringify(graphJson);
-			alert(graphJsonStr);
 			var code = joint.shapes.vpl.convertGraphToCode(graphJson);
-			alert(code);
 			executeScript('dummyPath', code, 'dummyOpts');
       m.set("circle-o-filled").color("green");
   }
@@ -293,7 +291,7 @@ function dropOnEditor(ev){
 				if (!paramName || paramName.trim() == ''){
 					continue;
 				}
-				currentAttributes['paramsOfCurrentBlock'][paramName] = paramValue;
+				currentAttributes['paramsOfCurrentBlock'][paramName.trim()] = paramValue.trim();
 			}
 		}
 		//alert("saveParams");

@@ -46,20 +46,22 @@ objectName = "com.ullink.testtools.ultest:name=ShipIt,type=ULTestExternalMBean";
             outputData.push([item.status, item.message]);
         }
         //outputGrid.setColspan(outputGrid.getRowId(0), 0, outputData.length)
+        outputGrid.clearAll();
         outputGrid.parse(outputData, "jsarray");
     }
 
     onExecuting = function() {
-
         //document.getElementById('status-image').src = '../resources/running.png';
     }
 
     onComplete = function() {
+      m.set('square-check').color('green');
         //document.getElementById('status-image').src = '../resources/running.png';
         currentSession = null;
     }
 
     onError = function() {
+      m.set('square-times').color('red');
         //document.getElementById('status-image').src = '../resources/running.png';
         currentSession = null;
     }
