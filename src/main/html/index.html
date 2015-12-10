@@ -51,7 +51,7 @@ div#footer-tab {
 var pageLayout;
 var graph = new joint.dia.Graph;
 var paper;
-
+var tabbar;
 function initLayout() {
   pageLayout = new dhtmlXLayoutObject({
       parent: "layout",
@@ -69,6 +69,26 @@ function initLayout() {
   pageLayout.cells("c").attachObject("editor");
   pageLayout.cells("d").attachObject("footer");
   pageLayout.cells("e").attachObject("user-input");
+
+	tabbar = new dhtmlXTabBar("footer");
+	tabbar.addTab("a1", "Test Report", null, null, true);
+	tabbar.addTab("a2", "Message");
+	tabbar.addTab("a3", "Script");
+	tabbar.enableAutoReSize(true);
+	tabbar.cells("a1").attachHTMLString("Under Construction");
+	tabbar.cells("a2").attachHTMLString("Under Construction");
+	tabbar.cells("a3").attachObject('script-div');
+	tabbar.attachEvent("onTabClick", function(id, lastId) {
+		if ("a3" === id)
+		{
+			tabbar.tabs("a3").progressOn();
+			var graphJson = graph.toJSON();
+			var graphJsonStr = JSON.stringify(graphJson);
+			var code = joint.shapes.vpl.convertGraphToCode(graphJson);
+			document.getElementById("script").value = code;
+			tabbar.tabs("a3").progressOff();
+		}
+	});
 }
 
 function allowDrop(ev){
@@ -132,17 +152,10 @@ function dropOnEditor(ev){
     <div id="editor" ondrop="dropOnEditor(event)" ondragover="allowDrop(event)"></div>
     <div id="user-input"></div>
     <div id="footer">
-      <div id="footer-tab" class="dhtmlxTabBar">
-        <div id="a1" name="Test Report" selected="1" style="display: none">
-          <textarea id="output-box" readonly=""></textarea>
-        </div>
-        <div id="a2" name="Message" style="display: none">
-        </div>
-        <div id="a3" name="Script" style="display: none">
-          <textarea id="script" readonly=""></textarea>
-        </div>
-      </div>
     </div>
+		<div id="script-div">
+			<textarea id="script" readonly=""></textarea>
+		</div>
 
 
 <script>
@@ -156,7 +169,6 @@ function dropOnEditor(ev){
 	saveScriptMarka.set('angle-double').color("orange").size('50').rotate("down");
 	var loadScriptMarka = new Marka('#loadScript');
 	loadScriptMarka.set('angle-double').color("blue").size('50');
-
   execute = function() {
 		  var graphJson = graph.toJSON();
 			var graphJsonStr = JSON.stringify(graphJson);
