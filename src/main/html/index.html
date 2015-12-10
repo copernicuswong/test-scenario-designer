@@ -407,10 +407,7 @@ function dropOnEditor(ev){
 		var startBlock = new joint.shapes.vpl.Start({
 				position: { x: 20, y: 20 }
 				});
-		var endBlock = new joint.shapes.vpl.End({
-				position: { x: 450, y: 450 }
-				});
-		graph.addCells([startBlock, endBlock]);
+		graph.addCell(startBlock);
 	}
 	initPaper();
 
