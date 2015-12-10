@@ -73,8 +73,8 @@ joint.shapes.vpl.Block = joint.shapes.vpl.toolElement.extend({
             '.frame': { width: 100, height: 100, 'ref-x': 0, 'ref-y': 0, stroke: 'black', fill: 'transparent', 'stroke-width': 1},
             '.annotation': { ref: '.body', 'font-size': 25, 'font-weight': 'bold', fill: '#0000FF', 'ref-x': 2, 'ref-y': 2},
             '.input':{ r: vplConst.portRad, stroke: 'black', fill: 'green', 'stroke-width': 1 },
-            '.output, .trueOutput, .falseOutput':{ r: vplConst.portRad, stroke: 'black', fill: 'blue', 'stroke-width': 1 },
-            '.loopBody':{ r: vplConst.portRad, stroke: 'black', fill: 'yellow', 'stroke-width': 1 },
+            '.output':{ r: vplConst.portRad, stroke: 'black', fill: 'blue', 'stroke-width': 1 },
+            '.loopBody, .trueBody, .falseBody':{ r: vplConst.portRad, stroke: 'black', fill: 'yellow', 'stroke-width': 1 },
         },
         params: {}
     }, joint.shapes.vpl.toolElement.prototype.defaults),
@@ -239,8 +239,8 @@ joint.shapes.vpl.IfElse = joint.shapes.vpl.Block.extend({
     markup: [
             '<g class="rotatable">',
             '<g class="scalable"><image class="body"/><rect class="frame"/></g>',
-            '<circle class="input"/>',
-            '<circle class="trueOutput"/><circle class="falseOutput"/>',
+            '<circle class="input"/><circle class="output"/>',
+            '<circle class="trueBody"/><circle class="falseBody"/>',
             '</g>'
             ].join(''),
 
@@ -251,8 +251,9 @@ joint.shapes.vpl.IfElse = joint.shapes.vpl.Block.extend({
             '.body': { width: 100, height: 100 , 'ref-y': 0.2},
             '.frame' :{width: 100, height: 100, 'ref-y': 0.2, stroke: 'black', fill: 'transparent', 'stroke-width': 2},
             '.input': { ref: '.body', 'ref-x': -vplConst.portRad, 'ref-y': 0.5, magnet: 'passive', port: 'in' },
-            '.trueOutput': { ref: '.body', 'ref-dx': vplConst.portRad, 'ref-y': 0.3, magnet: true, port: 'trueOut' },
-            '.falseOutput': { ref: '.body', 'ref-dx': vplConst.portRad, 'ref-y': 0.7, magnet: true, port: 'falseOut' },
+            '.output': { ref: '.body', 'ref-dx': vplConst.portRad, 'ref-y': 0.5, magnet: 'true', port: 'out' },
+            '.trueBody': { ref: '.body', 'ref-x': 0.3, 'ref-dy': vplConst.portRad, magnet: true, port: 'trueBody' },
+            '.falseBody': { ref: '.body', 'ref-x': 0.7, 'ref-dy': vplConst.portRad, magnet: true, port: 'falseBody' },
             image: { 'xlink:href': '../resources/if_else.png' }
         },
         params:{Condition: ''}
@@ -392,9 +393,16 @@ function createNodeForBlockAndLinkLoopBody(block, latestNode){
   return node;
 }
 
-
 function hasContent(str){
   return (str && str.trim() != '');
+}
+
+function concatIndentedCode(originalCode, codeToIndentAndAppend){
+  var indentedCode = codeToIndentAndAppend.replace(/(?:\r\n|\r|\n)/g, '\n    ');
+  var resultCode = originalCode.concat('    ');
+  resultCode = resultCode.concat(indentedCode);
+  resultCode = resultCode.concat('\n');
+  return resultCode;
 }
 
 convertNodeToCode = function(vplNode){
@@ -465,10 +473,7 @@ convertNodeToCode = function(vplNode){
     while (loopBodyNode){
       var codeInLoop = convertNodeToCode(loopBodyNode);
       if (hasContent(codeInLoop)){
-        codeInLoop = codeInLoop.replace(/(?:\r\n|\r|\n)/g, '\n    ');
-        code = code.concat('    ');
-        code = code.concat(codeInLoop);
-        code = code.concat('\n');
+        code = concatIndentedCode(code, codeInLoop);
       }
       loopBodyNode = loopBodyNode.nextNode;// subsequent loop body node, should be from loopBodyNode.nextNode
     }
@@ -483,27 +488,40 @@ convertNodeToCode = function(vplNode){
     while (loopBodyNode){
       var codeInLoop = convertNodeToCode(loopBodyNode);
       if (hasContent(codeInLoop)){
-        codeInLoop = codeInLoop.replace(/(?:\r\n|\r|\n)/g, '\n    ');
-        code = code.concat('    ');
-        code = code.concat(codeInLoop);
-        code = code.concat('\n');
+        code = concatIndentedCode(code, codeInLoop);
       }
       loopBodyNode = loopBodyNode.nextNode;// subsequent loop body node, should be from loopBodyNode.nextNode
     }
     code = code.concat('EndLoop');
     return code;
   }
+  if (vplBlock.type === 'vpl.IfElse'){
+    code = code.concat('if ( ');
+    code = code.concat(vplBlock.params.Condition);
+    code = code.concat(' )\n');
+    var ifBodyNode = vplNode.ifNextNode;
+    while (ifBodyNode){
+      var codeInBlock = convertNodeToCode(ifBodyNode);
+      if (hasContent(codeInBlock)){
+        code = concatIndentedCode(code, codeInBlock);
+      }
+      ifBodyNode = ifBodyNode.nextNode;
+    }
+    var elseBodyNode = vplNode.elseNextNode;
+    if (elseBodyNode){
+      code = code.concat('else\n');
+      while(elseBodyNode){
+        var codeInBlock = convertNodeToCode(elseBodyNode);
+        if (hasContent(codeInBlock)){
+          code = concatIndentedCode(code, codeInBlock);
+        }
+        elseBodyNode = elseBodyNode.nextNode;
+      }
+    }
+    code = code.concat('endif');
+    return code;
+  }
   return null;
-}
-
-function CurrentFrameInfo(isLoopIn, justEnteredLoopIn, latestNodeIn){
-  this.isLoop = isLoopIn;
-  this.justEnteredLoop = justEnteredLoopIn;
-  this.latestNode = latestNodeIn;
-}
-
-function findNextNode(){
-
 }
 
 function getWires(vplBlocksArray){
@@ -554,6 +572,18 @@ function findGraphConnectedToSpecBlockPort(wireArray, nonWireArray, specBlockId,
       if (loopBodySubGraph){
         mainGraph.loopBodyNode = loopBodySubGraph;
         loopBodySubGraph.prevNode = mainGraph;
+      }
+    }
+    if ('vpl.IfElse' === block.type){
+      var ifTrueSubGraph = findGraphConnectedToSpecBlockPort(wireArray, nonWireArray, block.id, 'trueBody');
+      if (ifTrueSubGraph){
+        mainGraph.ifNextNode = ifTrueSubGraph;
+        ifTrueSubGraph.prevNode = mainGraph;
+      }
+      var ifFalseSubGraph = findGraphConnectedToSpecBlockPort(wireArray, nonWireArray, block.id, 'falseBody');
+      if (ifFalseSubGraph){
+        mainGraph.elseNextNode = ifFalseSubGraph;
+        ifFalseSubGraph.prevNode = mainGraph;
       }
     }
     var mainSubGraph = findGraphConnectedToSpecBlockPort(wireArray, nonWireArray, block.id, 'out');
