@@ -3,6 +3,8 @@ objectName = "com.ullink.testtools.ultest:name=ShipIt,type=ULTestExternalMBean";
 
 (function() {
     executeScript = function(scriptPath, content, opts) {
+        outputData = new Array();
+        outputGrid.clearAll();
         var j4p = new Jolokia(url);
         console.debug(content);
         j4p.execute(objectName, "executeScript", scriptPath, content, {
@@ -12,15 +14,15 @@ objectName = "com.ullink.testtools.ultest:name=ShipIt,type=ULTestExternalMBean";
             }
         });
     }
-    
+
     var currentSession;
 
-    
+
     createExecutionSession = function(response) {
         console.log(response)
         currentSession = response;
     }
-    
+
     getFeed = function() {
         if (currentSession != null) {
             var j4p = new Jolokia(url);
@@ -31,7 +33,7 @@ objectName = "com.ullink.testtools.ultest:name=ShipIt,type=ULTestExternalMBean";
         });
         }
     }
-    
+
     display = function(response) {
         for (var idx in response) {
             var item = response[idx];
@@ -41,26 +43,28 @@ objectName = "com.ullink.testtools.ultest:name=ShipIt,type=ULTestExternalMBean";
             } else if (item.status === "Error") {
                 onError();
             }
-            document.getElementById('output-box').value += '\n' + item.message;
+            outputData.push([item.status, item.message]);
         }
+        //outputGrid.setColspan(outputGrid.getRowId(0), 0, outputData.length)
+        outputGrid.parse(outputData, "jsarray");
     }
-    
+
     onExecuting = function() {
-        
+
         //document.getElementById('status-image').src = '../resources/running.png';
     }
-    
+
     onComplete = function() {
         //document.getElementById('status-image').src = '../resources/running.png';
         currentSession = null;
     }
-    
+
     onError = function() {
         //document.getElementById('status-image').src = '../resources/running.png';
         currentSession = null;
     }
-    
-    window.setInterval(getFeed, 500);
-    
-    
+
+    window.setInterval(getFeed, 1000);
+
+
 }());
