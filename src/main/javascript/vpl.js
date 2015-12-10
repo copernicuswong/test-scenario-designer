@@ -496,79 +496,86 @@ convertNodeToCode = function(vplNode){
   return null;
 }
 
-joint.shapes.vpl.convertGraphToCode = function(graphJson){
-  var structuredGraph;
-  var latestNode;
-  var latestLoopBodyNode;
-  var inLoopBody = false;
-  var justFinishedLoopBody = false;
-  var array = graphJson.cells;
-  for(var i = 0; i < 1000; i++){ // set a limit to avoid infinite loop due to invalid structure
-    if (!structuredGraph){
-      var startBlock = findVplBlockByType(array, 'vpl.Start');
-      var firstNode = new GraphNode(startBlock);
-      structuredGraph = firstNode;
-      latestNode = firstNode;
-    }else{
-      var interestedNode;
-      if (inLoopBody){
-        interestedNode = latestLoopBodyNode;
-      }else{
-        interestedNode = latestNode;
-      }
-      var interestedBlockType = interestedNode.block.type;
-      if ('vpl.End' === interestedBlockType){
-        break; //done
-      }else if ('logic.Wire' === interestedBlockType){
-        var nextBlock = findVplBlockById(array, interestedNode.block.target.id);
-        if (nextBlock){
-          var node = createNodeForBlockAndLink(nextBlock, interestedNode);
-          if (inLoopBody){
-            latestLoopBodyNode = node;
-          }else{
-            latestNode = node;
-          }
-        }else{
-          alert("Invalid Program, no next block from wire " + latestNode.block.id);
-          break;
-        }
-      }else if ('vpl.IfElse' === interestedBlockType){
+function CurrentFrameInfo(isLoopIn, justEnteredLoopIn, latestNodeIn){
+  this.isLoop = isLoopIn;
+  this.justEnteredLoop = justEnteredLoopIn;
+  this.latestNode = latestNodeIn;
+}
 
-      }else if (!inLoopBody && !justFinishedLoopBody
-         && ('vpl.WhileLoop' === interestedBlockType || 'vpl.ForTimesLoop' === interestedBlockType || 'vpl.ForEachLoop' === interestedBlockType)){
-        inLoopBody = true;
-        var wire = findVplBlockBySourcePort(array, interestedNode.block.id, 'loopBody');
-        if (wire){
-          var node = createNodeForBlockAndLinkLoopBody(wire, interestedNode);
-          latestLoopBodyNode = node;
-        }else{
-          // loop has not body, still valid
-          inLoopBody = false;
+function findNextNode(){
+
+}
+
+function getWires(vplBlocksArray){
+  var wires = [];
+  for (var i in vplBlocksArray){
+    var vplBlock = vplBlocksArray[i];
+    if (vplBlock){
+        if (vplBlock.type === 'logic.Wire'){
+          wires.push(vplBlock);
         }
-      }else{
-        var wire = findVplBlockBySourcePort(array, interestedNode.block.id, 'out');
-        if (wire){
-          var node = createNodeForBlockAndLink(wire, interestedNode);
-          if (inLoopBody){
-            latestLoopBodyNode = node;
-          }else{
-            latestNode = node;
-            justFinishedLoopBody = false;
-          }
-        }else{
-          if (!inLoopBody){
-            alert("Invalid Program, not wire from output of " + interestedNode.block.id);
-            break;
-          }else{
-            // the end of loop body
-            inLoopBody = false;
-            justFinishedLoopBody = true;
-          }
+    }
+  }
+  return wires;
+}
+
+function getNonWires(vplBlocksArray){
+  var nonWires = [];
+  for (var i in vplBlocksArray){
+    var vplBlock = vplBlocksArray[i];
+    if (vplBlock){
+        if (vplBlock.type != 'logic.Wire'){
+          nonWires.push(vplBlock);
         }
+    }
+  }
+  return nonWires;
+}
+
+function findBlockConnectedToSpecBlockPort(wireArray, nonWireArray, specBlockId, specBlockPort){
+  var wire = findVplBlockBySourcePort(wireArray, specBlockId, specBlockPort);
+  if (wire){
+    var blockConnected = findVplBlockById(nonWireArray, wire.target.id);
+    return blockConnected;
+  }
+  return null;
+}
+
+function isLoopType(blockType){
+  return ('vpl.WhileLoop' === blockType || 'vpl.ForTimesLoop' === blockType || 'vpl.ForEachLoop' === blockType);
+}
+
+function findGraphConnectedToSpecBlockPort(wireArray, nonWireArray, specBlockId, specBlockPort){
+  var block = findBlockConnectedToSpecBlockPort(wireArray, nonWireArray, specBlockId, specBlockPort);
+  if (block){
+    var mainGraph = new GraphNode(block);
+    if (isLoopType(block.type)){
+      var loopBodySubGraph = findGraphConnectedToSpecBlockPort(wireArray, nonWireArray, block.id, 'loopBody');
+      if (loopBodySubGraph){
+        mainGraph.loopBodyNode = loopBodySubGraph;
+        loopBodySubGraph.prevNode = mainGraph;
       }
     }
-  }// end of for loop
-  var currentNode = structuredGraph;
+    var mainSubGraph = findGraphConnectedToSpecBlockPort(wireArray, nonWireArray, block.id, 'out');
+    if (mainSubGraph){
+      mainGraph.nextNode = mainSubGraph;
+      mainSubGraph.prevNode = mainGraph;
+    }
+    return mainGraph;
+  }
+  return null;
+}
+
+joint.shapes.vpl.convertGraphToCode = function(graphJson){
+  var array = graphJson.cells;
+  var wires = getWires(array);
+  var nonWires = getNonWires(array);
+  var startBlock = findVplBlockByType(nonWires, 'vpl.Start');
+  var graphConectedToOut = findGraphConnectedToSpecBlockPort(wires, nonWires, startBlock.id, 'out');
+  var mainGraph = new GraphNode(startBlock);
+  mainGraph.nextNode = graphConectedToOut;
+  graphConectedToOut.prevNode = mainGraph;
+  var currentNode = mainGraph;
   var code = '';
   while (currentNode){
     var convertedCode = convertNodeToCode(currentNode);
