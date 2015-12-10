@@ -2,6 +2,7 @@
 <head>
 <title>Test Scenario Designer</title>
 <link rel="stylesheet" type="text/css" href="../css/ultest.css" />
+<link rel="stylesheet" type="text/css" href="../css/vpl.css" />
 <link rel="stylesheet" type="text/css" href="../css/joint.css" />
 <link rel="stylesheet" type="text/css" href="../css/marka.min.css" />
 <link rel="stylesheet" type="text/css" href="../codebase/dhtmlx.css" />
@@ -16,6 +17,7 @@
 <script src="../javascript/jolokia.js"></script>
 <script src="../javascript/jolokia-simple.js"></script>
 <script src="../javascript/ultest.js"></script>
+<script src="../javascript/vpl.js"></script>
 
 <link rel="import" href="ultest-tools.html">
 <style>
@@ -33,12 +35,23 @@ div#layout {
   width: 99%;
   min-height: 100%;
 }
+div#editor {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
 div#footer-tab {
   min-height: 100%;
 }
+
+
 </style>
 <script>
 var pageLayout;
+var graph = new joint.dia.Graph;
+var paper;
+
 function initLayout() {
   pageLayout = new dhtmlXLayoutObject({
       parent: "layout",
@@ -58,6 +71,34 @@ function initLayout() {
   pageLayout.cells("e").attachObject("user-input");
 }
 
+function allowDrop(ev){
+	//alert("allowDrop called");
+	ev.preventDefault();
+}
+
+function drag(ev){
+	ev.dataTransfer.setData("blockName", ev.target.alt);
+	//alert(ev.target.alt);
+}
+
+function createBlockOnGraph(blockName, xCoor, yCoor){
+	//alert("creating block : " + blockName + " @ " + xCoor + ", " + yCoor)
+	var scope = joint.shapes.vpl;
+	var block = new scope[blockName]({
+		position: { x: xCoor, y: yCoor },
+	});
+	graph.addCell(block);
+}
+
+function dropOnEditor(ev){
+	ev.preventDefault();
+	var blockName = ev.dataTransfer.getData("blockName");
+	if(blockName){
+		createBlockOnGraph(blockName,  ev.clientX -105 , ev.clientY -105);
+	}
+	//alert("dropping block = " + blockName + " : " + ev.clientX + ", " + ev.clientY)
+}
+
 
 </script>
 </head>
@@ -69,20 +110,26 @@ function initLayout() {
         <tr>
           <td width="100px" align="center"><i id="status"/></td>
           <td width="50px"><i id="play" onclick="execute();"/></td>
-          <td><i id="stop" onclick="stop();"/></td>
+          <td width="50px"><i id="stop" onclick="stop();"/></td>
+					<td width="50px"><i id="saveScript" onclick="saveScript();"/></td>
+					<td width="50px"><i id="loadScript" onclick="loadScript();"/></td>
         </tr>
       </table>
       </div>
     <div id="tools">
       <tool-button icon="plug" caption="Connect"></tool-button>
       <tool-button icon="plug_delete" caption="Disconnect"></tool-button>
-      <tool-button icon="plug"></tool-button>
-      <tool-button icon="plug_delete"></tool-button>
-      <tool-button icon="plug"></tool-button>
-      <tool-button icon="plug_delete"></tool-button>
+      <tool-button icon="if_else" caption="IfElse"></tool-button>
+      <!--<tool-button icon="for_loop" caption="ForEachLoop"></tool-button>-->
+      <tool-button icon="times_loop" caption="ForTimesLoop"></tool-button>
+      <tool-button icon="while_loop" caption="WhileLoop"></tool-button>
+			<tool-button icon="print" caption="Print"></tool-button>
+			<tool-button icon="wait" caption="WaitForMessage"></tool-button>
+			<tool-button icon="send" caption="Send"></tool-button>
+			<tool-button icon="set_variable" caption="SetVariable"></tool-button>
     </div>
 
-    <div id="editor"></div>
+    <div id="editor" ondrop="dropOnEditor(event)" ondragover="allowDrop(event)"></div>
     <div id="user-input"></div>
     <div id="footer">
       <div id="footer-tab" class="dhtmlxTabBar">
@@ -99,19 +146,251 @@ function initLayout() {
 
 
 <script>
-
   var m = new Marka('#status');
   m.set('circle-o').color("#CCCCCC").size('50');
   var p = new Marka('#play');
   p.set('triangle').color("green").size('40').rotate("right");
   var stop = new Marka('#stop');
   stop.set('square').color("red").size('40');
+	var saveScriptMarka = new Marka('#saveScript');
+	saveScriptMarka.set('angle-double').color("orange").size('50').rotate("down");
+	var loadScriptMarka = new Marka('#loadScript');
+	loadScriptMarka.set('angle-double').color("blue").size('50');
+
   execute = function() {
+		  var graphJson = graph.toJSON();
+			var graphJsonStr = JSON.stringify(graphJson);
+			alert(graphJsonStr);
+			var code = joint.shapes.vpl.convertGraphToCode(graphJson);
+			alert(code);
+			executeScript('dummyPath', code, 'dummyOpts');
       m.set("circle-o-filled").color("green");
   }
   stop = function() {
       m.set("circle-times").color("red");
   }
+	saveScript = function(){
+		if (typeof(Storage)!=='undefined'){
+			var graphJson = graph.toJSON();
+			var graphJsonStr = JSON.stringify(graphJson);
+			localStorage.setItem("graphJson", graphJsonStr);
+			alert("Save Script");
+		}else{
+			alert("Cannot save script: local storage is undefined");
+		}
+	}
+	loadScript = function(){
+		if (typeof(Storage)!=='undefined'){
+			var graphJsonStr = localStorage.getItem("graphJson");
+			var graphJson = JSON.parse(graphJsonStr);
+			graph.fromJSON(graphJson);
+			alert("Loaded Script");
+		}else{
+			alert("Cannot save script: local storage is undefined");
+		}
+	}
+
+	var currentAttributes = {
+		currentBlock: {},
+		paramsOfCurrentBlock:{},
+		currentParamTable:{},
+		currentRetValDestTable: {}
+	};
+
+  saveReturnDest = function(){
+		var table = currentAttributes['currentRetValDestTable'];
+		if (table){
+			rows = table.getElementsByTagName('TR');
+			if (rows && rows.length > 0){
+				cells = rows[0].getElementsByTagName('TH');
+				if (cells.length<2){
+					return;
+				}
+				var paramValue = cells[1].innerHTML;
+				if (!paramValue || paramValue.trim() == ''){
+					return;
+				}
+				currentAttributes['currentBlock']['retValDest'] = paramValue;
+			}
+		}
+	}
+
+	createReturnValueDestTable = function(currentDest){
+		var table = document.createElement("TABLE");
+		var header = document.createElement("TR");
+		var keyCell = document.createElement("TH");
+		var keyText = document.createTextNode("Assign to:");
+		keyCell.appendChild(keyText);
+		var valueCell = document.createElement("TH");
+		var valueText = document.createTextNode(currentDest);
+		valueCell.setAttribute("contenteditable", "true");
+		valueCell.setAttribute("onfocusout", "saveReturnDest()");
+		valueCell.appendChild(valueText);
+		header.appendChild(keyCell);
+		header.appendChild(valueCell);
+		table.appendChild(header)
+		return table;
+	};
+
+  createParamTableWithHeader = function(isVarDefinition){
+		var headerKeyText;
+		if (isVarDefinition){
+			headerKeyText = "Variable";
+		}else{
+			headerKeyText = "Parameter";
+		}
+		var table = document.createElement("TABLE");
+		var header = document.createElement("TR");
+		var keyTh = document.createElement("TH");
+		var keyText = document.createTextNode(headerKeyText);
+		keyTh.appendChild(keyText);
+		var valueTh = document.createElement("TH");
+		var valueText = document.createTextNode("Value");
+		valueTh.appendChild(valueText);
+		header.appendChild(keyTh);
+		header.appendChild(valueTh);
+		table.appendChild(header)
+		return table;
+  };
+  saveParams = function(){
+		var table = currentAttributes['currentParamTable'];
+		if (table){
+			rows = table.getElementsByTagName('TR');
+			if (rows.length < 2){
+				// first row is header
+				return;
+			}
+			for (i=1, j = rows.length; i < j; ++i){
+				cells = rows[i].getElementsByTagName('TD');
+				if (!cells.length){
+					continue;
+				}
+				var paramName = cells[0].innerHTML;
+				var paramValue = cells[1].innerHTML;
+				if (!paramName || paramName.trim() == ''){
+					continue;
+				}
+				currentAttributes['paramsOfCurrentBlock'][paramName] = paramValue;
+			}
+		}
+		//alert("saveParams");
+	}
+
+  populateWithEmptyEditableRows = function(table, numOfRows){
+		for (i = 0; i < numOfRows; ++i){
+			var row = document.createElement("TR");
+			var keyTd = document.createElement("TD");
+			var keyText = document.createTextNode("");
+			keyTd.setAttribute("contenteditable", "true");
+			keyTd.setAttribute("onfocusout", "saveParams()");
+			keyTd.appendChild(keyText);
+			var valueTd = document.createElement("TD");
+			valueTd.setAttribute("contenteditable", "true");
+			valueTd.setAttribute("onfocusout", "saveParams()");
+			var valueText = document.createTextNode("");
+			valueTd.appendChild(valueText);
+			row.appendChild(keyTd);
+			row.appendChild(valueTd);
+			table.appendChild(row);
+		}
+	}
+
+  popupateTable = function(table, blockParams, isVarDefinition){
+		var i = 0;
+		for (var key in blockParams){
+			if (!key || key.trim() == ''){
+				continue;
+			}
+			var row = document.createElement("TR");
+			var keyTd = document.createElement("TD");
+			var keyText = document.createTextNode(key);
+			if (isVarDefinition){
+				keyTd.setAttribute("contenteditable", "true");
+				keyTd.setAttribute("onfocusout", "saveParams()");
+			}
+			keyTd.appendChild(keyText);
+			var valueTd = document.createElement("TD");
+			valueTd.setAttribute("contenteditable", "true");
+			valueTd.setAttribute("onfocusout", "saveParams()");
+			var valueText = document.createTextNode(blockParams[key]);
+			valueTd.appendChild(valueText);
+			row.appendChild(keyTd);
+			row.appendChild(valueTd);
+			table.appendChild(row);
+			++i;
+		}
+		if (isVarDefinition && i <10){
+			populateWithEmptyEditableRows(table, 10-i);
+		}
+	}
+
+  showAttrs = function(cellView){
+		if (cellView && cellView.model.attributes.type){
+			var attrType = cellView.model.attributes.type;
+			if (attrType.startsWith('vpl.') && attrType != 'vpl.Start' && attrType != 'vpl.End'){
+				//=============================
+				var isVarDef = (attrType === 'vpl.SetVariable');
+				var paramTable = createParamTableWithHeader(isVarDef);
+				var blockParams = cellView.model.attributes.params;
+				popupateTable(paramTable, blockParams, isVarDef);
+				//=============================
+				var retValDestTable = null;
+				if (cellView.model.attributes.hasOwnProperty('retValDest')){
+					retValDestTable = createReturnValueDestTable(cellView.model.attributes.retValDest);
+				}
+			  //=============================
+				var userInputNode = document.getElementById("user-input");
+				// remove previous data
+				while(userInputNode.firstChild){
+					userInputNode.removeChild(userInputNode.firstChild);
+				}
+				// show new data
+				userInputNode.appendChild(paramTable);
+				if (retValDestTable){
+					userInputNode.appendChild(retValDestTable);
+				}
+			  currentAttributes['currentBlock'] = cellView.model.attributes;
+			  currentAttributes['paramsOfCurrentBlock'] = blockParams;
+				currentAttributes['currentParamTable'] = paramTable;
+				currentAttributes['currentRetValDestTable'] = retValDestTable;
+			}
+		}
+	};
+
+  function initPaper(){
+		paper = new joint.dia.Paper({
+			el: $('#editor'),
+			model: graph,
+			width: 2000, height: 600, gridSize: 1,
+			snapLinks: true,
+			linkPinning: false,
+			defaultLink: new joint.shapes.logic.Wire,
+
+			validateConnection: function(vs, ms, vt, mt, e, vl) {
+				if (e === 'target') {
+					// target requires an input port to connect
+					return (mt && mt.getAttribute('class') && mt.getAttribute('class').toLowerCase().indexOf('input') >= 0);
+				} else { // e === 'source'
+					// source requires an output port to connect
+					return ms && ms.getAttribute('class') && ms.getAttribute('class').toLowerCase().indexOf('output') >= 0;
+				}
+			}
+		});
+
+		paper.on('cell:pointerdblclick', function(cellView, evt, x, y){
+			showAttrs(cellView);
+		});
+
+		var startBlock = new joint.shapes.vpl.Start({
+				position: { x: 20, y: 20 }
+				});
+		var endBlock = new joint.shapes.vpl.End({
+				position: { x: 450, y: 450 }
+				});
+		graph.addCells([startBlock, endBlock]);
+	}
+	initPaper();
+
 </script>
 </body>
 </html>

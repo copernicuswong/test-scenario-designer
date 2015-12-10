@@ -14,7 +14,7 @@
   padding: 0px;
 }
 #editor {
-    background-color: yellow;
+    background-color: white;
   float:left;
 }
 #footer {
@@ -28,7 +28,44 @@
   word-wrap: break-word;
 }
 #user-input {
-    background-color: black;
+  background-color: #00FFFF;
   float:left;
+  width: 100%;
+  height: 100%;
+}
+#user-input th{
+   background-color: #4CAF50;
+   height: 40px;
+   width: 100px;
+   max-width: 100px;
+   color: white;
+}
+#user-input td{
+  padding: 15px;
+  width: 100px;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: "Courier"
+}
+#user-input tr{
+  height: 10px;
+}
+#user-input tr:nth-child(even){
+  background-color: #f2f2f2
+}
+#user-input tr:nth-child(odd){
+  background-color: #CCCC00
+}
+#user-input table{
+  width : 300px;
+  max-width : 300px;
+}
+#user-input table:nth-child(2) th{
+  background-color: #FF0000;
+  height: 40px;
+  width: 100px;
+  max-width: 100px;
+  color: white;
 }
 </style>
