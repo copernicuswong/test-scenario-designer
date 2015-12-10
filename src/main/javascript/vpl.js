@@ -164,7 +164,7 @@ joint.shapes.vpl.Connect = joint.shapes.vpl.Block_1_1.extend({
 
         type: 'vpl.Connect',
         attrs: { image: { 'xlink:href': '../resources/plug.png' }},
-        params: { pluginName: '', as : ''}
+        params: { Plugin: ''}
     }, joint.shapes.vpl.Block_1_1.prototype.defaults)
 });
 
@@ -172,8 +172,8 @@ joint.shapes.vpl.Disconnect = joint.shapes.vpl.Block_1_1.extend({
     defaults: joint.util.deepSupplement({
 
         type: 'vpl.Disconnect',
-        attrs: { image: { 'xlink:href': '../resources/plug_delete.png' }}
-
+        attrs: { image: { 'xlink:href': '../resources/plug_delete.png' }},
+        params: { Plugin: ''}
     }, joint.shapes.vpl.Block_1_1.prototype.defaults)
 });
 
@@ -182,7 +182,8 @@ joint.shapes.vpl.Send = joint.shapes.vpl.Block_1_1.extend({
 
         type: 'vpl.Send',
         attrs: { image: { 'xlink:href': '../resources/send.png' }},
-        params: { pluginName: '', message: ''}
+        params: { Plugin: '', Message: ''},
+        retValDest: ''
     }, joint.shapes.vpl.Block_1_1.prototype.defaults)
 });
 
@@ -199,7 +200,7 @@ joint.shapes.vpl.Print = joint.shapes.vpl.Block_1_1.extend({
 
         type: 'vpl.Print',
         attrs: { image: { 'xlink:href': '../resources/print.png' }},
-        params: {tokens: ''}
+        params: {Message: ''}
 
     }, joint.shapes.vpl.Block_1_1.prototype.defaults)
 });
@@ -217,7 +218,7 @@ joint.shapes.vpl.WaitForMessage = joint.shapes.vpl.Block_1_1.extend({
     defaults: joint.util.deepSupplement({
 
         type: 'vpl.WaitForMessage',
-        params:{pluginName: '', message: '', timeOutMs: ''}
+        params:{Plugin: '', Message: '', Timeout: ''}
     }, joint.shapes.vpl.Wait.prototype.defaults)
 });
 
@@ -254,7 +255,7 @@ joint.shapes.vpl.IfElse = joint.shapes.vpl.Block.extend({
             '.falseOutput': { ref: '.body', 'ref-dx': vplConst.portRad, 'ref-y': 0.7, magnet: true, port: 'falseOut' },
             image: { 'xlink:href': '../resources/if_else.png' }
         },
-        params:{condition: ''}
+        params:{Condition: ''}
     }, joint.shapes.vpl.Block.prototype.defaults)
 });
 
@@ -300,7 +301,7 @@ joint.shapes.vpl.WhileLoop = joint.shapes.vpl.Loop.extend({
 
         type: 'vpl.WhileLoop',
         attrs: { image: { 'xlink:href': '../resources/while_loop.png' }},
-        params:{condition: ''}
+        params:{Condition: ''}
     }, joint.shapes.vpl.Loop.prototype.defaults)
 });
 
@@ -309,7 +310,7 @@ joint.shapes.vpl.ForTimesLoop = joint.shapes.vpl.Loop.extend({
 
         type: 'vpl.ForTimesLoop',
         attrs: { image: { 'xlink:href': '../resources/times_loop.png' }},
-        params:{ times: ''}
+        params:{ Times: ''}
     }, joint.shapes.vpl.Loop.prototype.defaults)
 });
 
@@ -417,18 +418,23 @@ convertNodeToCode = function(vplNode){
   }
   if (vplBlock.type === 'vpl.Connect'){
     code = code.concat('connect ');
-    code = code.concat(vplBlock.params.pluginName);
-    if (hasContent(vplBlock.params.as)){
-      code = code.concat(' as ');
-      code = code.concat(vplBlock.params.as);
-    }
+    code = code.concat(vplBlock.params.Plugin);
+    return code;
+  }
+  if (vplBlock.type === 'vpl.Disconnect'){
+    code = code.concat('disconnect ');
+    code = code.concat(vplBlock.params.Plugin);
     return code;
   }
   if (vplBlock.type === 'vpl.Send'){
+    if (hasContent(vplBlock.retValDest)){
+        code = code.concat(vplBlock.retValDest);
+        code = code.concat(' = ');
+    }
     code = code.concat('send ');
-    code = code.concat(vplBlock.params.pluginName);
+    code = code.concat(vplBlock.params.Plugin);
     code = code.concat(' ');
-    code = code.concat(vplBlock.params.message);
+    code = code.concat(vplBlock.params.Message);
     return code;
   }
   if (vplBlock.type === 'vpl.WaitForMessage'){
@@ -437,28 +443,29 @@ convertNodeToCode = function(vplNode){
         code = code.concat(' = ');
     }
     code = code.concat('waitFor ');
-    code = code.concat(vplBlock.params.pluginName);
+    code = code.concat(vplBlock.params.Plugin);
     code = code.concat(' ');
-    code = code.concat(vplBlock.params.message);
-    if (hasContent(vplBlock.params.timeOutMs)){
+    code = code.concat(vplBlock.params.Message);
+    if (hasContent(vplBlock.params.Timeout)){
         code = code.concat(' for ');
-        code = code.concat(vplBlock.params.timeOutMs);
+        code = code.concat(vplBlock.params.Timeout);
     }
     return code;
   }
   if (vplBlock.type === 'vpl.Print'){
     code = code.concat('print ');
-    code = code.concat(vplBlock.params.tokens);
+    code = code.concat(vplBlock.params.Message);
     return code;
   }
   if (vplBlock.type === 'vpl.WhileLoop'){
     code = code.concat('while ( ');
-    code = code.concat(vplBlock.params.condition);
+    code = code.concat(vplBlock.params.Condition);
     code = code.concat(' )\n');
     var loopBodyNode = vplNode.loopBodyNode;  // first loop body node, from vplNode.loopBodyNode
     while (loopBodyNode){
       var codeInLoop = convertNodeToCode(loopBodyNode);
       if (hasContent(codeInLoop)){
+        codeInLoop = codeInLoop.replace(/(?:\r\n|\r|\n)/g, '\n    ');
         code = code.concat('    ');
         code = code.concat(codeInLoop);
         code = code.concat('\n');
@@ -470,12 +477,13 @@ convertNodeToCode = function(vplNode){
   }
   if (vplBlock.type === 'vpl.ForTimesLoop'){
     code = code.concat('Loop ');
-    code = code.concat(vplBlock.params.times);
+    code = code.concat(vplBlock.params.Times);
     code = code.concat('\n');
     var loopBodyNode = vplNode.loopBodyNode;  // first loop body node, from vplNode.loopBodyNode
     while (loopBodyNode){
       var codeInLoop = convertNodeToCode(loopBodyNode);
       if (hasContent(codeInLoop)){
+        codeInLoop = codeInLoop.replace(/(?:\r\n|\r|\n)/g, '\n    ');
         code = code.concat('    ');
         code = code.concat(codeInLoop);
         code = code.concat('\n');
